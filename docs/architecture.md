@@ -48,48 +48,45 @@ Reads outnumber writes about **10 to 1**, so QuickNotes is **read-heavy**. The n
 ## 3. Architecture diagram
 
 ```text
-                         +----------------------+
-                         |   Client (browser /  |
-                         |      mobile app)     |
-                         +----------+-----------+
-                                    |
-                                    v
-                         +----------------------+
-                         |         DNS          |  name -> IP of CDN / load balancer
-                         +----------+-----------+
-                                    |
-                 +------------------+-------------------+
-                 | static files                         | API calls (/v1/...)
-                 | (HTML, CSS, JS)                      v
-                 v                            +----------------------+
-         +---------------+                    |    Load Balancer     |
-         |      CDN      |                    | (2 instances, HA)    |
-         +---------------+                    +----------+-----------+
-                                                         |
-                          +------------------------------+-----------------------------+
-                          |                              |                             |
-                          v                              v                             v
-                  +---------------+              +---------------+             +---------------+
-                  |  App Server 1 |              |  App Server 2 |             |  App Server N |
-                  |  (stateless)  |              |  (stateless)  |             |  (stateless)  |
-                  +--+---+-----+--+              +--+---+-----+--+             +--+---+-----+--+
-                     |   |     |                    |   |     |                   |   |     |
-        +------------+   |     +---------+----------+   |     +---------+---------+   |     |
-        | (1) read first |               |  (2) on miss |               |             |     |
-        v                |               v              |               |  (3) writes |     | (4) enqueue job
- +--------------+        |        +--------------+      |               v             |     v
- |    Cache     |        +------->| Read Replica |      |        +--------------+     |  +-----------+
- |   (Redis,    |                 | (SQL reads)  |      +------->| Primary DB   |     +->|   Queue   |
- |  primary +   |                 +------^-------+               | (PostgreSQL) |        +-----+-----+
- |   replica)   |                        |   replication         |  all writes  |              |
- +--------------+                        +-----------------------+--------------+              v
-                                                                                        +-------------+
-                                                                                        |   Worker(s) |
-                                                                                        | search index|
-                                                                                        | cleanup etc.|
-                                                                                        +------+------+
-                                                                                               |
-                                                                                               +--> writes to Primary DB
+   +----------------------------+
+   |  Client (browser / mobile) |
+   +-------------+--------------+
+                 |
+                 v
+   +----------------------------+
+   |            DNS             |   quicknotes.example -> CDN / load balancer
+   +------+--------------+------+
+          |              |
+  static  |              |  API calls (/v1/...)
+  files   v              v
+   +-------------+   +----------------------------+
+   |     CDN     |   |       Load Balancer        |  (2 instances, high availability)
+   | HTML/CSS/JS |   +--------------+-------------+
+   +-------------+                  |
+                  +-----------------+-----------------+
+                  |                 |                 |
+                  v                 v                 v
+          +--------------+  +--------------+  +--------------+
+          | App Server 1 |  | App Server 2 |  | App Server N |   (stateless)
+          +------+-------+  +------+-------+  +------+-------+
+                 |                 |                 |
+                 +-----------------+-----------------+
+                 |                 |                 |
+                 | (1) read first  | (3) writes      | (4) enqueue job
+                 v                 v                 v
+        +----------------+  +----------------+  +----------------+
+        | Cache (Redis)  |  |  Primary DB    |  |     Queue      |
+        | primary+replica|  |  (PostgreSQL)  |  +--------+-------+
+        +--------+-------+  +--------+-------+           |
+                 |                   |                   v
+   (2) on a miss |                   | replication  +----------------+
+                 v                   v              |   Worker(s)    |
+        +------------------------------------+      | search index,  |
+        |  Read Replica (serves SQL reads)   |      | cleanup        |
+        +------------------------------------+      +--------+-------+
+                                                             |
+                                 worker writes results back  |
+                                 to the Primary DB  <--------+
 ```
 
 Standby copies (a standby for the primary database that can be promoted, a replica for the cache, and a second load balancer) are described in section 7.
