@@ -50,7 +50,6 @@ button {
 button:hover:not(:disabled) { background: #174a85; }
 button:disabled { background: #9aa5b1; cursor: not-allowed; }
 
-/* Status messages: loading, success, error, empty */
 #status { margin: 0.75rem 0 0; padding: 0; min-height: 1.5rem; }
 #status.status { padding: 0.5rem 0.75rem; border-radius: 4px; border-left: 4px solid; }
 .status-loading { background: #e6f0fa; color: #0b3a6b; border-color: #2680c2; }
@@ -69,3 +68,9 @@ button:disabled { background: #9aa5b1; cursor: not-allowed; }
 #notes-list p { margin: 0; color: #3e4c59; }
 .delete-btn { background: #b42318; padding: 0.3rem 0.75rem; font-size: 0.9rem; }
 .delete-btn:hover:not(:disabled) { background: #8a1c12; }
+
+#notes-list li.empty-state {
+  text-align: center;
+  color: #52606d;
+  border-style: dashed;
+}
