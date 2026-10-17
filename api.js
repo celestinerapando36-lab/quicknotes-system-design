@@ -109,5 +109,91 @@ async function loadNotes() {
   }
 }
 
+// ---------- Validation ----------
+
+// Returns an error message, or "" when the title is valid.
+function validateTitle(title) {
+  if (title.length === 0) {
+    return "A title is required.";
+  }
+  if (title.length > MAX_TITLE_LENGTH) {
+    return `The title is too long (${title.length}/${MAX_TITLE_LENGTH} characters).`;
+  }
+  return "";
+}
+
+// ---------- POST: create a note ----------
+
+async function createNote(title, body) {
+  setBusy(true);
+  setStatus("Saving note...", "loading");
+  try {
+    const created = await request(API_URL, {
+      method: "POST",
+      body: JSON.stringify({ title, body, userId: 1 }),
+    });
+    notes.unshift({ ...created, _key: nextKey++ });
+    renderNotes();
+    form.reset();
+    setStatus(`Note "${title}" was created (server id ${created.id}).`, "success");
+  } catch (error) {
+    setStatus(`Could not create the note. ${describeError(error)}`, "error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ---------- DELETE: remove a note ----------
+
+async function deleteNote(key) {
+  const note = notes.find((n) => n._key === key);
+  if (!note) return;
+
+  setBusy(true);
+  setStatus("Deleting note...", "loading");
+  try {
+    await request(`${API_URL}/${note.id}`, { method: "DELETE" });
+    notes = notes.filter((n) => n._key !== key);
+    renderNotes();
+    if (notes.length === 0) {
+      setStatus("Note deleted. There are no notes left.", "empty");
+    } else {
+      setStatus("Note deleted.", "success");
+    }
+  } catch (error) {
+    setStatus(`Could not delete the note. ${describeError(error)}`, "error");
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ---------- Events ----------
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (isBusy) return;
+
+  const title = titleInput.value.trim();
+  const body = bodyInput.value.trim();
+  const problem = validateTitle(title);
+
+  if (problem) {
+    titleInput.setAttribute("aria-invalid", "true");
+    setStatus(problem, "error");
+    titleInput.focus();
+    return;
+  }
+  titleInput.removeAttribute("aria-invalid");
+  createNote(title, body);
+});
+
+// One listener for all Delete buttons (event delegation)
+notesList.addEventListener("click", (event) => {
+  const button = event.target.closest(".delete-btn");
+  if (button && !isBusy) {
+    deleteNote(Number(button.dataset.key));
+  }
+});
+
 loadBtn.addEventListener("click", loadNotes);
 setStatus("Click \"Load notes\" to fetch your notes.", "");
