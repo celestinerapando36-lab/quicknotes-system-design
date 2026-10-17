@@ -140,7 +140,10 @@ async function createNote(title, body) {
   }
 }
 
-
+// JSONPlaceholder is a practice API: it replies OK to DELETE but never really saves or
+// removes anything, and every new note comes back with id 101. My approach: I still send
+// the real DELETE request, and only when the server replies OK do I remove the note
+// from the page. Each note also has a local _key so deleting one never removes another.
 async function deleteNote(key) {
   const note = notes.find((n) => n._key === key);
   if (!note) return;
